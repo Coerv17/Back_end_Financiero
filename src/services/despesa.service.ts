@@ -2,34 +2,33 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-interface Despesa {
-  valor: number;
-  dataVencimento: Date;
-  descricao?: string;
-  pessoaId: number;
-  cartaoId?: number;
-  mesReferencia: string;
-}
-
-export const despesaService = {
-  async criarDespesaSimples(despesa: Despesa) {
-    return await prisma.despesa.create({
-      data: despesa,
+export const createDespesaPARCELADO = async (despesaquery: any) => {
+  return await prisma.$transaction(async (prisma) => {
+    // Criando a despesa principal
+    const despesaCriada = await prisma.despesa.create({
+      data: {
+        valor: despesaquery.valor,
+        dataVencimento: despesaquery.dataVencimento,
+        descricao: despesaquery.descricao,
+        pessoaId: despesaquery.pessoaId,
+        cartaoId: despesaquery.cartaoId,
+        tipoDespesa: "PARCELADO",
+        quantParcelas: despesaquery.parcelas.length,
+        mesReferencia: despesaquery.parcelas[0].mesReferencia, // Pegando do primeiro mês
+      },
     });
-  },
 
-  async criarDespesaParcelada(despesas: Despesa[]) {
-    return await prisma.$transaction(
-      despesas.map((despesa) => prisma.despesa.create({ data: despesa }))
-    );
-  },
-};
+    // Criando as parcelas associadas a essa despesa
+    await prisma.parcela.createMany({
+      data: despesaquery.parcelas.map((parcela: any) => ({
+        despesaId: despesaCriada.id, // Relaciona com a despesa criada
+        numero: parcela.parcela, // Aqui corrigimos para `numero`
+        valor: parcela.valor,
+        vencimento: parcela.dataParcela, // Nome correto do campo no schema
+        mesReferencia: parcela.mesReferencia,
+      })),
+    });
 
-export const findAllService = async (): Promise<any[]> => {
-  try {
-    const despesas = await prisma.despesa.findMany();
-    return despesas;
-  } catch (error) {
-    throw error;
-  }
+    return despesaCriada;
+  });
 };

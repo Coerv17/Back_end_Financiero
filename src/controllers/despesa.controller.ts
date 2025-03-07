@@ -1,68 +1,88 @@
 import { Request, Response } from "express";
-import { despesaService, findAllService } from "../services/despesa.service";
-import { addMonths } from "date-fns";
+import { addMonths, format, lastDayOfMonth } from "date-fns";
+import { createDespesaPARCELADO } from "../services/despesa.service";
 
-export const criarDespesa = async (req: Request, res: Response) => {
+// Função auxiliar para validar a data de vencimento
+const validarDataVencimento = (dataVencimento: string): { data: Date; mesReferencia: string } | null => {
+  const data = new Date(dataVencimento);
+  if (isNaN(data.getTime())) return null;
+  const mesReferencia = format(data, "yyyy-MM");
+  return { data, mesReferencia };
+};
+
+export const despesaSimples = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { tipoDespesa } = req.body;
-    //console.log(`ESCOLHIDO ${tipoDespesa}`);
-    const { valor, dataVencimento, descricao, pessoaId, cartaoId, quantParcelas } = req.body;
-    //DEIXANDO A DATA GENERICA
-    const data = new Date(dataVencimento);
-    if (isNaN(data.getTime())) {
+    const { valor, dataVencimento, descricao, pessoaId, cartaoId } = req.body;
+
+    const validacao = validarDataVencimento(dataVencimento);
+    if (!validacao) {
       res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
-    const mesReferencia = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
 
-    if (tipoDespesa === "SIMPLES") {
-      const despesa = {
-        valor,
-        dataVencimento: data,
-        descricao,
-        pessoaId,
-        cartaoId,
-        mesReferencia,
-      };
-      const novaDespesa = await despesaService.criarDespesaSimples(despesa);
-      res.status(201).json(novaDespesa);
-    } else if (tipoDespesa === "PARCELADO") {
-      const valorParcelas = Math.floor((valor / quantParcelas) * 100) / 100;
-      const parcelas = []; // Criar um array para armazenar todas as parcelas
+    const novaDespesa = {
+      valor,
+      dataVencimento: validacao.data,
+      descricao,
+      pessoaId,
+      cartaoId,
+      mesReferencia: validacao.mesReferencia,
+    };
 
-      let somaParcelas = 0;
-      // fazendo o for para gerar mais de uma parcela
-      for (let i = 0; i < quantParcelas; i++) {
-        const dataParcela = addMonths(new Date(dataVencimento), i); // Corrigindo a data
+    console.log("Dados enviados para o service:", JSON.stringify(novaDespesa, null, 2));
 
-        let valorCorrigido = i === quantParcelas - 1 ? Number((valor - somaParcelas).toFixed(2)) : valorParcelas;
-        somaParcelas += valorCorrigido;
-        parcelas.push({ parcela: i + 1, dataParcela, valor: valorCorrigido });
-      }
-      const despesa = { valor, dataVencimento: data, descricao, pessoaId, cartaoId, mesReferencia };
-      res.status(200).json({ parcelas }); // Retorna todas as parcelas
-
-      //
-    } else if (tipoDespesa === "FIXO") {
-      res.json({ message: `Despesa do tipo ${tipoDespesa} processada.` });
-    } else {
-      res.status(400).json({ message: `Tipo de despesa ${tipoDespesa} ainda não implementado.` });
-    }
+    res.status(201).json(novaDespesa);
+    return;
   } catch (error) {
-    console.error("Erro ao criar despesa:", error);
+    console.error("Erro ao criar despesa simples:", error);
     res.status(500).json({ message: "Erro interno do servidor" });
+    return;
   }
 };
-
-export const FindaAllDepesa = async (req: Request, res: Response): Promise<void> => {
+export const despesaPARCELADO = async (req: Request, res: Response): Promise<void> => {
   try {
-    const cartoes = await findAllService();
-    if (!cartoes || cartoes.length === 0) {
-      res.status(400).send({ message: "Não há User cadastrados" });
+    const { valor, dataVencimento, descricao, pessoaId, cartaoId, quantParcelas } = req.body;
+    const validacao = validarDataVencimento(dataVencimento);
+    if (!validacao) {
+      res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
-    res.status(200).json(cartoes);
-  } catch (error: any) {
-    res.status(500).json({ message: "Erro ao buscar os Users", error: error.message });
+
+    const parcelas = [];
+    const dataBase = new Date(dataVencimento);
+    // Calcula o último dia do mês em UTC
+    const ultimoDiaDoMesUTC = new Date(Date.UTC(dataBase.getUTCFullYear(), dataBase.getUTCMonth() + 1, 0)).getUTCDate();
+    const isUltimoDia = dataBase.getUTCDate() === ultimoDiaDoMesUTC;
+
+    for (let i = 0; i < quantParcelas; i++) {
+      let dataParcela;
+      if (isUltimoDia) {
+        // Cria a data usando UTC para garantir que seja o último dia do mês
+        dataParcela = new Date(Date.UTC(dataBase.getUTCFullYear(), dataBase.getUTCMonth() + i + 1, 0));
+      } else {
+        dataParcela = addMonths(dataBase, i);
+      }
+      const mesReferenciaParcela = format(dataParcela, "yyyy-MM");
+      parcelas.push({ parcela: i + 1, dataParcela, valor, mesReferencia: mesReferenciaParcela });
+    }
+
+    const despesaquery = {
+      valor,
+      dataVencimento: validacao.data,
+      descricao,
+      pessoaId,
+      cartaoId,
+      parcelas,
+      mesReferencia: validacao.mesReferencia,
+    };
+
+    console.log("Dados enviados para o service:", JSON.stringify(despesaquery, null, 2));
+    const passandoService = await createDespesaPARCELADO(despesaquery);
+    res.status(201).json(passandoService);
+    return;
+  } catch (error) {
+    console.error("Erro ao criar despesa parcelada:", error);
+    res.status(500).json({ message: "Erro interno do servidor" });
+    return;
   }
 };
