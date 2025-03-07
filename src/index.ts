@@ -17,6 +17,4 @@ app.get("/", (req: Request, res: Response) => {
   res.status(200).json({ message: "API está no ar!" });
 });
 
-app.listen(port, () => {
-  console.log(`Servidor rodando na porta ${port}`);
-});
+export default app;
