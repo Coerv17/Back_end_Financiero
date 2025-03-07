@@ -33,19 +33,19 @@ model Cartao {
 }
 
 model Despesa {
-  id             Int         @id @default(autoincrement())
-  valor          Float // Valor total da despesa
-  dataVencimento DateTime // Data de vencimento
-  dataCriacao    DateTime    @default(now())
-  descricao      String?     @db.Text
-  pago           Boolean     @default(false)
-  tipoDespesa    TipoDespesa @default(SIMPLES) // Tipo inicial como "simples"
-  quantParcelas  Int? // Usado se o tipo for PARCELADO ou REPETIR
-  mesReferencia  String
-  pessoa         Pessoa      @relation(fields: [pessoaId], references: [id])
-  pessoaId       Int
+  id                Int         @id @default(autoincrement())
+  valor             Float // Valor total da despesa
+  dataVencimento    DateTime // Data de vencimento
+  dataCriacao       DateTime    @default(now())
+  descricao         String?     @db.Text
+  pago              Boolean     @default(false)
+  tipoDespesa       TipoDespesa @default(SIMPLES) // Tipo inicial como "simples"
+  quantParcelas     Int? // Usado se o tipo for PARCELADO ou REPETIR
+  mesReferencia     String
+  pessoaId          Int
+  cartaoId          Int?
+  referenciaParcela String
 
-  cartao   Cartao?   @relation(fields: [cartaoId], references: [id])
-  cartaoId Int?
-
+  pessoa Pessoa  @relation(fields: [pessoaId], references: [id])
+  cartao Cartao? @relation(fields: [cartaoId], references: [id])
 }
