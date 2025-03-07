@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { addMonths, format, lastDayOfMonth } from "date-fns";
+import { addMonths, format } from "date-fns";
 import { createDespesaPARCELADO } from "../services/despesa.service";
 
 // Função auxiliar para validar a data de vencimento
@@ -10,35 +10,6 @@ const validarDataVencimento = (dataVencimento: string): { data: Date; mesReferen
   return { data, mesReferencia };
 };
 
-export const despesaSimples = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { valor, dataVencimento, descricao, pessoaId, cartaoId } = req.body;
-
-    const validacao = validarDataVencimento(dataVencimento);
-    if (!validacao) {
-      res.status(400).json({ message: "Data de vencimento inválida" });
-      return;
-    }
-
-    const novaDespesa = {
-      valor,
-      dataVencimento: validacao.data,
-      descricao,
-      pessoaId,
-      cartaoId,
-      mesReferencia: validacao.mesReferencia,
-    };
-
-    console.log("Dados enviados para o service:", JSON.stringify(novaDespesa, null, 2));
-
-    res.status(201).json(novaDespesa);
-    return;
-  } catch (error) {
-    console.error("Erro ao criar despesa simples:", error);
-    res.status(500).json({ message: "Erro interno do servidor" });
-    return;
-  }
-};
 export const despesaPARCELADO = async (req: Request, res: Response): Promise<void> => {
   try {
     const { valor, dataVencimento, descricao, pessoaId, cartaoId, quantParcelas } = req.body;
@@ -48,37 +19,35 @@ export const despesaPARCELADO = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const parcelas = [];
+    const despesas = [];
     const dataBase = new Date(dataVencimento);
-    // Calcula o último dia do mês em UTC
+    // Verifica se o dia da data base é o último dia do mês
     const ultimoDiaDoMesUTC = new Date(Date.UTC(dataBase.getUTCFullYear(), dataBase.getUTCMonth() + 1, 0)).getUTCDate();
     const isUltimoDia = dataBase.getUTCDate() === ultimoDiaDoMesUTC;
 
     for (let i = 0; i < quantParcelas; i++) {
       let dataParcela;
       if (isUltimoDia) {
-        // Cria a data usando UTC para garantir que seja o último dia do mês
+        // Se for o último dia, sempre busca o último dia do mês correspondente
         dataParcela = new Date(Date.UTC(dataBase.getUTCFullYear(), dataBase.getUTCMonth() + i + 1, 0));
       } else {
         dataParcela = addMonths(dataBase, i);
       }
-      const mesReferenciaParcela = format(dataParcela, "yyyy-MM");
-      parcelas.push({ parcela: i + 1, dataParcela, valor, mesReferencia: mesReferenciaParcela });
+      const mesReferencia = format(dataParcela, "yyyy-MM");
+
+      despesas.push({
+        valor,
+        dataVencimento: dataParcela,
+        descricao,
+        pessoaId,
+        cartaoId,
+        mesReferencia,
+      });
     }
 
-    const despesaquery = {
-      valor,
-      dataVencimento: validacao.data,
-      descricao,
-      pessoaId,
-      cartaoId,
-      parcelas,
-      mesReferencia: validacao.mesReferencia,
-    };
-
-    console.log("Dados enviados para o service:", JSON.stringify(despesaquery, null, 2));
-    const passandoService = await createDespesaPARCELADO(despesaquery);
-    res.status(201).json(passandoService);
+    console.log("Dados enviados para o service:", JSON.stringify(despesas, null, 2));
+    //const passandoService = await createDespesaPARCELADO(despesas);
+    //res.status(201).json(passandoService);
     return;
   } catch (error) {
     console.error("Erro ao criar despesa parcelada:", error);

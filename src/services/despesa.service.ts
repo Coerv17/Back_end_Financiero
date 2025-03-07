@@ -18,17 +18,6 @@ export const createDespesaPARCELADO = async (despesaquery: any) => {
       },
     });
 
-    // Criando as parcelas associadas a essa despesa
-    await prisma.parcela.createMany({
-      data: despesaquery.parcelas.map((parcela: any) => ({
-        despesaId: despesaCriada.id, // Relaciona com a despesa criada
-        numero: parcela.parcela, // Aqui corrigimos para `numero`
-        valor: parcela.valor,
-        vencimento: parcela.dataParcela, // Nome correto do campo no schema
-        mesReferencia: parcela.mesReferencia,
-      })),
-    });
-
     return despesaCriada;
   });
 };

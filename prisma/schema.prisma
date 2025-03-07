@@ -47,17 +47,5 @@ model Despesa {
 
   cartao   Cartao?   @relation(fields: [cartaoId], references: [id])
   cartaoId Int?
-  parcelas Parcela[] // Adicionando a relação inversa com Parcela
-}
 
-model Parcela {
-  id            Int      @id @default(autoincrement())
-  numero        Int // Número da parcela (1, 2, 3...)
-  valor         Float // Valor da parcela
-  vencimento    DateTime // Data de vencimento da parcela
-  pago          Boolean  @default(false) // Se a parcela foi paga ou não
-  mesReferencia String
-
-  despesa   Despesa @relation(fields: [despesaId], references: [id])
-  despesaId Int
 }
