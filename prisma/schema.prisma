@@ -1,0 +1,51 @@
+datasource db {
+  provider = "postgresql" // ou outro provider de sua preferência
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum TipoDespesa {
+  SIMPLES
+  FIXO
+  PARCELADO
+}
+
+model Pessoa {
+  id          Int      @id @default(autoincrement())
+  nome        String   @db.VarChar(100)
+  dataCriacao DateTime @default(now())
+
+  despesas Despesa[]
+  // Removemos a relação direta com Cartao
+}
+
+model Cartao {
+  id              Int      @id @default(autoincrement())
+  nome            String   @db.VarChar(50)
+  ultimos4Digitos String   @db.VarChar(4)
+  dataCriacao     DateTime @default(now())
+
+  // Removemos a associação com Pessoa
+  despesas Despesa[] // Relacionamento com despesas, para identificar em quais despesas o cartão foi usado
+}
+
+model Despesa {
+  id                Int         @id @default(autoincrement())
+  valor             Float // Valor total da despesa
+  dataVencimento    DateTime // Data de vencimento
+  dataCriacao       DateTime    @default(now())
+  descricao         String?     @db.Text
+  pago              Boolean     @default(false)
+  tipoDespesa       TipoDespesa @default(SIMPLES) // Tipo inicial como "simples"
+  quantParcelas     Int? // Usado se o tipo for PARCELADO ou REPETIR
+  mesReferencia     String
+  pessoaId          Int
+  cartaoId          Int?
+  referenciaParcela String
+
+  pessoa Pessoa  @relation(fields: [pessoaId], references: [id])
+  cartao Cartao? @relation(fields: [cartaoId], references: [id])
+}
